@@ -1,0 +1,72 @@
+const User = require('../models/User');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
+const register = async (req, res) => {
+
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).json({
+            message: 'All fields required'
+        });
+    }
+
+    const duplicate = await User.findOne({ username });
+
+    if (duplicate) {
+        return res.status(409).json({
+            message: 'Username already exists'
+        });
+    }
+
+    const hashedPwd = await bcrypt.hash(password, 10);
+
+    const user = await User.create({
+        username,
+        password: hashedPwd
+    });
+
+    res.status(201).json(user);
+};
+
+const login = async (req, res) => {
+
+    const { username, password } = req.body;
+
+    const foundUser = await User.findOne({ username });
+
+    if (!foundUser) {
+        return res.status(401).json({
+            message: 'Unauthorized'
+        });
+    }
+
+    const match = await bcrypt.compare(
+        password,
+        foundUser.password
+    );
+
+    if (!match) {
+        return res.status(401).json({
+            message: 'Unauthorized'
+        });
+    }
+
+    const accessToken = jwt.sign(
+        {
+            id: foundUser._id
+        },
+        process.env.ACCESS_TOKEN_SECRET,
+        {
+            expiresIn: '1d'
+        }
+    );
+
+    res.json({ accessToken });
+};
+
+module.exports = {
+    register,
+    login
+};
